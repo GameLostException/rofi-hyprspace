@@ -25,3 +25,8 @@ install: $(PLUGIN)
 
 clean:
 	rm -f $(PLUGIN)
+
+## Install wrapper script to ~/.local/bin/
+install-wrapper:
+	install -m 755 rofi-focus-fix.sh $(HOME)/.local/bin/rofi-focus-fix.sh
+	@echo "Installed rofi-focus-fix.sh to $(HOME)/.local/bin/"
