@@ -50,8 +50,13 @@ typedef struct {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 static char *run_hyprctl(const char *args) {
-    char cmd[256];
-    snprintf(cmd, sizeof(cmd), "hyprctl %s 2>/dev/null", args);
+    const char *sig = g_getenv("HYPRLAND_INSTANCE_SIGNATURE");
+    char cmd[512];
+    if (sig && sig[0])
+        snprintf(cmd, sizeof(cmd),
+                 "HYPRLAND_INSTANCE_SIGNATURE=%s hyprctl %s 2>/dev/null", sig, args);
+    else
+        snprintf(cmd, sizeof(cmd), "hyprctl %s 2>/dev/null", args);
     FILE *fp = popen(cmd, "r");
     if (!fp) return NULL;
     GString *buf = g_string_new(NULL);
@@ -306,9 +311,23 @@ static ModeMode hyprspace_result(Mode *sw, int menu_retv,
                                   unsigned int selected_line) {
     HyprspaceMode *pd = sw->private_data;
     if (menu_retv & MENU_OK) {
-        char cmd[256];
-        snprintf(cmd, sizeof(cmd), "hyprctl dispatch focuswindow address:%s",
-                 pd->windows[selected_line].address);
+        const char *addr = pd->windows[selected_line].address;
+
+        // Write selection to file so wrapper script can re-assert after
+        // rofi closes and follow_mouse potentially overwrites focus.
+        FILE *sel = fopen("/tmp/hyprspace-selection", "w");
+        if (sel) { fprintf(sel, "%s\n", addr); fclose(sel); }
+
+        const char *sig = g_getenv("HYPRLAND_INSTANCE_SIGNATURE");
+        char cmd[512];
+        if (sig && sig[0]) {
+            snprintf(cmd, sizeof(cmd),
+                     "HYPRLAND_INSTANCE_SIGNATURE=%s hyprctl dispatch focuswindow address:%s",
+                     sig, addr);
+        } else {
+            snprintf(cmd, sizeof(cmd),
+                     "hyprctl dispatch focuswindow address:%s", addr);
+        }
         system(cmd);
         return MODE_EXIT;
     }
