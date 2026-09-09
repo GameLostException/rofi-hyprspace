@@ -135,14 +135,6 @@ static HyprspaceFilter parse_filter(void) {
 // Searches: ~/.local/share/applications, /usr/local/share/applications,
 //           /usr/share/applications
 static char *find_desktop_icon(const char *class_name) {
-    const char *dirs[] = {
-        g_get_home_dir(),          // prepend later
-        "/usr/local/share/applications",
-        "/usr/share/applications",
-        NULL
-    };
-
-    // Build local apps dir
     char local_dir[512];
     snprintf(local_dir, sizeof(local_dir), "%s/.local/share/applications",
              g_get_home_dir());
@@ -153,9 +145,7 @@ static char *find_desktop_icon(const char *class_name) {
         "/usr/share/applications",
         NULL
     };
-    (void)dirs;
 
-    // Try exact match first, then case-insensitive, then prefix match
     for (int i = 0; search_dirs[i]; i++) {
         GDir *dir = g_dir_open(search_dirs[i], 0, NULL);
         if (!dir) continue;
@@ -166,15 +156,13 @@ static char *find_desktop_icon(const char *class_name) {
         while ((fname = g_dir_read_name(dir))) {
             if (!g_str_has_suffix(fname, ".desktop")) continue;
 
-            // Check if filename (without .desktop) matches class
             char *base = g_strndup(fname, strlen(fname) - 8);
             int match = (g_ascii_strcasecmp(base, class_name) == 0);
             g_free(base);
-
             if (!match) continue;
 
-            // Read Icon= line
-            char path[512];
+            /* Read the Icon= field from the .desktop file */
+            char path[1024];
             snprintf(path, sizeof(path), "%s/%s", search_dirs[i], fname);
             FILE *fp = fopen(path, "r");
             if (!fp) continue;
@@ -183,7 +171,6 @@ static char *find_desktop_icon(const char *class_name) {
             while (fgets(line, sizeof(line), fp)) {
                 if (strncmp(line, "Icon=", 5) == 0) {
                     char *icon = g_strstrip(line + 5);
-                    // Strip newline
                     icon[strcspn(icon, "\r\n")] = 0;
                     best = g_strdup(icon);
                     break;
@@ -196,8 +183,8 @@ static char *find_desktop_icon(const char *class_name) {
         if (best) return best;
     }
 
-    // Fallback: try class-desktop suffix
-    return g_strdup_printf("%s-desktop", class_name);
+    /* Fallback: use class name as icon name directly */
+    return g_strdup(class_name);
 }
 
 // Get icon uid for a window, using desktop file lookup

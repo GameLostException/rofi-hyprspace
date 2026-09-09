@@ -43,23 +43,33 @@ Set via `HYPRSPACE_FILTER` environment variable:
 
 ## Usage
 
-```bash
-# Current workspace + monitor (Alt+Tab)
-HYPRSPACE_FILTER=ws+mon rofi -show hyprspace -plugin-path ~/.local/lib/rofi
+> **Important**: Use `rofi-focus-fix.sh` instead of calling rofi directly.
+> Hyprland's `follow_mouse=1` overwrites focus when rofi (a floating window)
+> closes. The wrapper re-asserts the selection after follow_mouse settles.
 
-# All windows (Super+Tab)
-HYPRSPACE_FILTER=all rofi -show hyprspace -plugin-path ~/.local/lib/rofi
+```bash
+# ~/Tools/rofi-focus-fix.sh ws+mon [rofi args...]  ← ALT+TAB
+# ~/Tools/rofi-focus-fix.sh all    [rofi args...]  ← SUP+TAB
 ```
 
 ### Hyprland keybinds
 
 ```ini
 # ~/.config/hypr/hyprland.conf
-bindl = ALT, Tab, exec, rofi -show hyprspace \
-    -plugin-path ~/.local/lib/rofi \
-    -theme ~/.config/rofi/hyprland.rasi \
-    -window-format "{c} — {t}"
+bind  = SUPER, Tab, exec, /path/to/rofi-focus-fix.sh all    -plugin-path ~/.local/lib/rofi -theme ~/.config/rofi/hyprland.rasi
+bind  = ALT,   Tab, exec, /path/to/rofi-focus-fix.sh ws+mon -plugin-path ~/.local/lib/rofi -theme ~/.config/rofi/hyprland.rasi
 ```
+
+### Why the wrapper?
+
+On selection, hyprspace calls `hyprctl dispatch focuswindow address:X` — this
+works, but `follow_mouse=1` immediately refocuses whatever window is under
+the cursor when the rofi floating surface closes (~50ms later), overwriting
+the selection. The wrapper re-asserts focus 200ms after rofi exits using
+`hyprctl --batch "cursor:no_warps true ; focuswindow ; no_warps false"`.
+
+The address is communicated via `/tmp/hyprspace-selection` written by the
+plugin's `_result` callback before rofi exits.
 
 ## How it works
 
