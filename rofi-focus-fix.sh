@@ -8,7 +8,10 @@
 #
 # Fix: hyprspace writes the selected address to /tmp/hyprspace-selection
 # before exit. We read it after rofi closes, wait for follow_mouse to
-# settle, then re-assert with cursor:no_warps to win the race.
+# settle, then re-assert focus.
+#
+# Hyprland v0.57+: hyprctl dispatch focuswindow fails because the lua router
+# can't parse "address:0x..." args. Use hyprctl eval instead.
 #
 # Usage: rofi-focus-fix.sh <filter> [rofi args...]
 #   filter: all | ws+mon | ws | mon
@@ -36,10 +39,13 @@ TARGET=$(tr -d '[:space:]' < /tmp/hyprspace-selection)
 rm -f /tmp/hyprspace-selection
 [[ -z "$TARGET" ]] && exit 0
 
-# Wait for follow_mouse refocus to settle, then re-assert atomically
+# Wait for follow_mouse refocus to settle, then re-assert atomically.
+# v0.57: use hyprctl eval with hl.dsp.focus({window=...}) since hyprctl dispatch
+# can no longer parse "focuswindow address:0x..." via the lua evaluator.
 sleep 0.2
-hyprctl --batch \
-    "keyword cursor:no_warps true ; \
-     dispatch focuswindow address:${TARGET} ; \
-     keyword cursor:no_warps false" \
-    >/dev/null 2>&1
+hyprctl eval "
+local w = hl.get_window('address:${TARGET}')
+if w then
+    hl.dispatch(hl.dsp.focus({window=w}))
+end
+" >/dev/null 2>&1

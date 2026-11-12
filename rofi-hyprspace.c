@@ -306,14 +306,23 @@ static ModeMode hyprspace_result(Mode *sw, int menu_retv,
         if (sel) { fprintf(sel, "%s\n", addr); fclose(sel); }
 
         const char *sig = g_getenv("HYPRLAND_INSTANCE_SIGNATURE");
-        char cmd[512];
+        char cmd[1024];
+        // Hyprland v0.57+: hyprctl dispatch routes through lua and cannot parse
+        // "focuswindow address:0x..." because the colon and address syntax is
+        // not valid lua. Use hyprctl eval with hl.dsp.focus({window=...}) instead.
+        const char *eval_code =
+            "local w = hl.get_window('address:%s'); "
+            "if w then hl.dispatch(hl.dsp.focus({window=w})) end";
+        char lua_buf[512];
+        snprintf(lua_buf, sizeof(lua_buf), eval_code, addr);
+
         if (sig && sig[0]) {
             snprintf(cmd, sizeof(cmd),
-                     "HYPRLAND_INSTANCE_SIGNATURE=%s hyprctl dispatch focuswindow address:%s",
-                     sig, addr);
+                     "HYPRLAND_INSTANCE_SIGNATURE=%s hyprctl eval \"%s\"",
+                     sig, lua_buf);
         } else {
             snprintf(cmd, sizeof(cmd),
-                     "hyprctl dispatch focuswindow address:%s", addr);
+                     "hyprctl eval \"%s\"", lua_buf);
         }
         system(cmd);
         return MODE_EXIT;
