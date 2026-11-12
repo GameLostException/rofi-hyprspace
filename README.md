@@ -54,22 +54,23 @@ Set via `HYPRSPACE_FILTER` environment variable:
 
 ### Hyprland keybinds
 
-```ini
-# ~/.config/hypr/hyprland.conf
-bind  = SUPER, Tab, exec, /path/to/rofi-focus-fix.sh all    -plugin-path ~/.local/lib/rofi -theme ~/.config/rofi/hyprland.rasi
-bind  = ALT,   Tab, exec, /path/to/rofi-focus-fix.sh ws+mon -plugin-path ~/.local/lib/rofi -theme ~/.config/rofi/hyprland.rasi
+```lua
+-- ~/.config/hypr/hyprland.lua
+local mod = "SUPER"
+hl.bind(mod .. " + Tab", hl.dsp.exec_cmd("/path/to/rofi-focus-fix.sh all    -plugin-path ~/.local/lib/rofi -theme ~/.config/rofi/hyprland.rasi -hover-select -me-select-entry \"\" -me-accept-entry \"MousePrimary\""))
+hl.bind("ALT + Tab",     hl.dsp.exec_cmd("/path/to/rofi-focus-fix.sh ws+mon -plugin-path ~/.local/lib/rofi -theme ~/.config/rofi/hyprland.rasi -hover-select -me-select-entry \"\" -me-accept-entry \"MousePrimary\""))
 ```
 
 ### Why the wrapper?
 
-On selection, hyprspace calls `hyprctl dispatch focuswindow address:X` — this
-works, but `follow_mouse=1` immediately refocuses whatever window is under
-the cursor when the rofi floating surface closes (~50ms later), overwriting
-the selection. The wrapper re-asserts focus 200ms after rofi exits using
-`hyprctl --batch "cursor:no_warps true ; focuswindow ; no_warps false"`.
+On selection, hyprspace writes the selected window address to `/tmp/hyprspace-selection`.
+`follow_mouse=1` immediately refocuses whatever window is under the cursor when the rofi
+floating surface closes (~50ms later), overwriting the selection. The wrapper re-asserts
+focus 200ms after rofi exits via `hyprctl eval` with `hl.dsp.focus({window=...})`.
 
-The address is communicated via `/tmp/hyprspace-selection` written by the
-plugin's `_result` callback before rofi exits.
+> **Hyprland v0.57+**: `hyprctl dispatch focuswindow address:X` fails because the lua
+> router cannot parse `address:0x...` syntax. The wrapper and the plugin both use
+> `hyprctl eval "local w = hl.get_window('address:ADDR'); if w then hl.dispatch(hl.dsp.focus({window=w})) end"` instead.
 
 ## How it works
 
@@ -80,7 +81,9 @@ On init, the plugin:
 4. Builds display entries as `ShortClass — Title`
 5. Fetches app icons via rofi's icon fetcher using the window class
 
-On selection, dispatches `hyprctl dispatch focuswindow address:<addr>`.
+On selection, uses `hyprctl eval` with `hl.get_window()` and `hl.dsp.focus()` to focus
+the selected window (Hyprland v0.57+ compatible — `hyprctl dispatch focuswindow` cannot
+parse `address:0x...` through the Lua router).
 
 ## Limitations
 
